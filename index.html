@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hunter</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<script src="js/pixi.min.js"></script>
+<script>
+    let Container = PIXI.Container,
+        Sprite = PIXI.Sprite,
+        loader = PIXI.loader,
+        resources = loader.resources,
+        TextStyle = PIXI.TextStyle,
+        Text = PIXI.Text
+    ;
+</script>
+<script>
+    let app = new PIXI.Application({
+        width: window.innerWidth,
+        height: window.innerHeight,
+    });
+    document.body.appendChild(app.view);
+
+    loader.add('images/treasureHunter.json')
+        .load(setup);
+
+    const stage = app.stage, container = {x: 28, y: 10, width: 488, height: 480};
+    let dungeon, explorer, treasure, explorerHit = false,
+        myTexture, gameScene, gameOverScene;
+
+    console.log(stage.x);
+    console.log(stage.renderer.view.width);
+    function setup() {
+        //game start scene
+        gameScene = new Container();
+        app.stage.addChild(gameScene);
+        // game over scene
+        gameOverScene = new Container();
+        gameOverScene.visible = false;
+        app.stage.addChild(gameOverScene);
+        // create an alias
+        myTexture = resources['images/treasureHunter.json']
+            .textures;
+        //dungeon 地牢
+        dungeon = new Sprite(myTexture['dungeon.png']);
+        gameScene.addChild(dungeon);
+
+        //Door
+        door = new Sprite(myTexture['door.png']);
+        door.position.set(32, 0);
+        gameScene.addChild(door);
+
+        //Explorer 探险家
+        explorer = new Sprite(myTexture['explorer.png']);
+        explorer.x = 68;
+        explorer.y = gameScene.height / 2 - explorer.height / 2;
+        explorer.vx = 0;
+        explorer.vy = 0;
+        gameScene.addChild(explorer);
+
+        //Treasure 宝藏
+        treasure = new Sprite(myTexture['treasure.png']);
+        treasure.x = gameScene.width - treasure.width - 48;
+        treasure.y = gameScene.height / 2 - treasure.height / 2;
+        gameScene.addChild(treasure);
+
+        // make blobs 生成泡泡怪
+        let numberOfBlobs = 6,
+            spacing = 48,
+            xOffset = 150,
+            speed = 2,
+            direction = 1;
+        blobs = [];
+        for (let i = 0; i < numberOfBlobs; i++) {
+            let blob = new Sprite(myTexture['blob.png']);
+            let x = spacing * i + xOffset;
+            let y = randomInt(0, app.stage.height - blob.height);
+            blob.x = x;
+            blob.y = y;
+            blob.vy = speed * direction;
+            direction *= -1;
+            blobs.push(blob);
+            gameScene.addChild(blob);
+        }
+        //制作血条
+        healthBar = new PIXI.DisplayObjectContainer();
+        healthBar.position.set(stage.width - 170, 4);
+        gameScene.addChild(healthBar);
+
+        let innerBar = new PIXI.Graphics();
+        innerBar.beginFill(0x000000);
+        innerBar.drawRect(0, 0, 128, 8);
+        innerBar.endFill();
+        healthBar.addChild(innerBar);
+
+        let outerBar = new PIXI.Graphics();
+        outerBar.beginFill(0xFF3300);
+        outerBar.drawRect(0, 0, 128, 8);
+        outerBar.endFill();
+        healthBar.addChild(outerBar);
+
+        healthBar.outer = outerBar;
+
+        // 制作消息文字
+        let style = new TextStyle({
+            fontFamily: 'Futura',
+            fontSize: 64,
+            fill: 'white',
+        });
+        message = new Text('The End!', style);
+        message.x = 120;
+        message.y = stage.height / 2 - 32;
+        gameOverScene.addChild(message);
+
+        state = play;
+        app.ticker.add(delta => gameLoop(delta));
+
+        let left = keyboard(37),
+            up = keyboard(38),
+            right = keyboard(39),
+            down = keyboard(40);
+        left.press = () => {
+            explorer.vx = -2;
+            explorer.vy = 0;
+        };
+        left.release = () => {
+            explorer.vx = 0;
+            explorer.vy = 0;
+        };
+
+        right.press = () => {
+            explorer.vx = 2;
+            explorer.vy = 0;
+        };
+        right.release = () => {
+            explorer.vx = 0;
+            explorer.vy = 0;
+        };
+        up.press = () => {
+            explorer.vx = 0;
+            explorer.vy = -2;
+        };
+        up.release = () => {
+            explorer.vx = 0;
+            explorer.vy = 0;
+        };
+        down.press=()=>{
+            explorer.vx=0;
+            explorer.vy=2;
+        };
+        down.release=()=>{
+            explorer.vx=0;
+            explorer.vy=0;
+        }
+    }
+
+    function gameLoop(delta) {
+        state(delta);
+    }
+
+    function play(delta) {
+        explorer.x += explorer.vx;
+        explorer.y += explorer.vy;
+
+        blobs.forEach(blob => {
+            blob.y += blob.vy;
+
+            let blobHitsWall = contain(blob, container);
+            if (blobHitsWall === 'top' || blobHitsWall === 'bottom') {
+                blob.vy *= -1;
+            }
+            //
+            if (hitTestRectangle(explorer, blob)) {
+                explorerHit = true;
+            }
+        });
+        if (explorerHit) {
+            explorer.alpha = .5;
+            healthBar.outer.width -= 1;
+            explorerHit = false;
+        } else {
+            explorer.alpha = 1;
+        }
+
+        if (hitTestRectangle(explorer, treasure)) {
+            treasure.x = explorer.x + 8;
+            treasure.y = explorer.y + 8;
+        }
+
+        if (hitTestRectangle(treasure, door)) {
+            state = end;
+            message.text = 'You won!';
+        }
+
+        if (healthBar.outer.width < 0) {
+            state = end;
+            message.text = 'You lost!';
+        }
+    }
+
+    function end() {
+        gameOverScene.visible = true;
+        gameScene.visible = false;
+    }
+
+    function contain(sprite, container) {
+        let conllision = undefined;
+        // left
+        if (sprite.x < container.x) {
+            sprite.x = container.x;
+            conllision = 'left';
+        }
+        // top
+        if (sprite.y < container.y) {
+            sprite.y = container.y;
+            conllision = 'top';
+        }
+        // right
+        if (sprite.x + sprite.width > container.width) {
+            sprite.x = container.width - sprite.width;
+            conllision = 'right';
+        }
+        // bottom
+        if (sprite.y + sprite.height > container.height) {
+            sprite.y = container.height - sprite.height;
+            conllision = 'bottom';
+        }
+        return conllision;
+    }
+
+    function hitTestRectangle(r1, r2) {
+        let hit, combinedHalfWidths, combinedHalfHeights, vx, vy;
+        hit = false;
+        r1.centerX = r1.x + r1.width / 2;
+        r1.centerY = r1.y + r1.height / 2;
+        r2.centerX = r2.x + r2.width / 2;
+        r2.centerY = r2.y + r2.height / 2;
+
+        r1.halfWidth = r1.width / 2;
+        r1.halfHeight = r1.height / 2;
+        r2.halfWidth = r2.width / 2;
+        r2.halfHeight = r2.height / 2;
+
+        vx = r1.centerX - r2.centerX;
+        vy = r1.centerY - r2.centerY;
+
+        combinedHalfWidths = r1.halfWidth + r2.halfWidth;
+        combinedHalfHeights = r1.halfHeight + r2.halfHeight;
+
+        if (Math.abs(vx) < combinedHalfWidths &&
+            Math.abs(vy) < combinedHalfHeights) {
+            hit = true;
+        }
+        return hit;
+    }
+
+    function randomInt(start, end) {
+        const random = Math.random() * (end - start) + start;
+        return parseInt(random.toFixed(0));
+    }
+
+    function keyboard(keyCode) {
+        let key = {
+            code: keyCode,
+            isDown: false,
+            isUp: true,
+            press: undefined,
+            release: undefined,
+        };
+
+        key.downHandler = event => {
+            if (event.keyCode === key.code) {
+                if (key.isUp && key.press) key.press();
+                key.isDown = true;
+                key.isUp = false;
+            }
+            event.preventDefault();
+        };
+
+        key.upHandler = event => {
+            if (event.keyCode === key.code) {
+                if (key.isDown && key.release) key.release();
+                key.isDown = false;
+                key.isUp = true;
+            }
+            event.preventDefault();
+        };
+
+        window.addEventListener(
+            'keydown', key.downHandler.bind(key), false
+        );
+        window.addEventListener(
+            'keyup', key.upHandler.bind(key), false
+        );
+        return key;
+    }
+</script>
+
+</body>
+</html>
