@@ -10,8 +10,8 @@
         }
     </style>
 </head>
-<body style="width: 100%; height: 100%;">
-<div style="width: 500px; height: 480px; margin: 0 auto;"
+<body style="width: 100%; height: 100%; background-color: #000;">
+<div style="width: 1024px; height: 800px; margin: 0 auto; "
      id="container"></div>
 <script src="js/pixi.min.js"></script>
 <script>
@@ -22,11 +22,22 @@
         TextStyle = PIXI.TextStyle,
         Text = PIXI.Text
     ;
+
+    const containerWidth = 1024,
+        containerHeight = 800,
+        leftBorder = 66,
+        rightBorder = leftBorder,
+        topBorder = 26,
+        bottomBorder = topBorder * 2,
+        healthBarWidth = 128,
+        healthBarHeight = 20,
+        moveSpeed = 2
+    ;
 </script>
 <script>
     let app = new PIXI.Application({
-        width: 500,
-        height: 480,
+        width: containerWidth,
+        height: containerHeight,
     });
     document.getElementById('container').appendChild(app.view);
     // document.body.appendChild(app.view);
@@ -34,16 +45,113 @@
     loader.add('images/treasureHunter.json')
         .load(setup);
 
-    const stage = app.stage, container = {x: 28, y: 8, width: 488, height: 480};
+    const stage = app.stage, container = {
+        x: leftBorder, y: topBorder,
+        width: containerWidth - leftBorder,
+        height: containerHeight - bottomBorder,
+    };
     let dungeon, explorer, treasure, explorerHit = false,
         myTexture, gameScene, gameOverScene;
 
-    console.log(stage.x);
-    console.log(stage.renderer.view.width);
+    let bindMoveKeyboard = function () {
+        gameScene.interactive = true;
+        gameScene.on('touchstart', (event) => {
+            // debugger;
+            console.log('touch start');
+            console.log(JSON.stringify(event.data));
+            startPos = {
+                x: event.data.global.x,
+                y: event.data.global.y,
+            };
+            // startPos = {
+            //     x: touch.pageX,
+            //     y: touch.pageY,
+            //     time: new Date(),
+            // };
+            isScrolling = 0;
+        });
+        gameScene.on('touchmove', (event) => {
+            if (event.scale && event.scale !== 1) {
+                return;
+            }
+            console.log(JSON.stringify(event.data));
+            console.log(startPos);
+            let touch = event.data.global;
+            endPos = {
+                x: touch.x - startPos.x,
+                y: touch.y - startPos.y,
+            };
+            console.log(JSON.stringify(endPos));
+            if (endPos.x > 0) {
+                explorer.vx = moveSpeed;
+            } else if (endPos.x < 0) {
+                explorer.vx = -moveSpeed;
+            };
+            if (endPos.y > 0) {
+                explorer.vy = moveSpeed;
+            } else if (endPos.y < 0) {
+                explorer.vy = -moveSpeed;
+            }
+        });
+        gameScene.on('touchend', event => {
+            explorer.vx = 0;
+            explorer.vy = 0;
+            console.log('touch end');
+
+        });
+        let left = [keyboard(37), keyboard(72), keyboard(65)],
+            up = [keyboard(38), keyboard(75), keyboard(87)],
+            right = [keyboard(39), keyboard(76), keyboard(68)],
+            down = [keyboard(40), keyboard(74), keyboard(83)];
+        left.forEach(key => {
+            key.press = () => {
+                explorer.vx = -moveSpeed;
+                // explorer.vy = 0;
+            };
+            key.release = () => {
+                explorer.vx = 0;
+                // explorer.vy = 0;
+            };
+        });
+
+        right.forEach(key => {
+            key.press = () => {
+                explorer.vx = moveSpeed;
+                // explorer.vy = 0;
+            };
+            key.release = () => {
+                explorer.vx = 0;
+                // explorer.vy = 0;
+            };
+        });
+
+        up.forEach(key => {
+            key.press = () => {
+                // explorer.vx = 0;
+                explorer.vy = -moveSpeed;
+            };
+            key.release = () => {
+                // explorer.vx = 0;
+                explorer.vy = 0;
+            };
+        });
+
+        down.forEach(key => {
+            key.press = () => {
+                // explorer.vx = 0;
+                explorer.vy = moveSpeed;
+            };
+            key.release = () => {
+                // explorer.vx = 0;
+                explorer.vy = 0;
+            }
+        });
+    };
 
     function setup() {
         //game start scene
         gameScene = new Container();
+        // gameScene.rotation = 1.5;
         app.stage.addChild(gameScene);
         // game over scene
         gameOverScene = new Container();
@@ -54,16 +162,18 @@
             .textures;
         //dungeon 地牢
         dungeon = new Sprite(myTexture['dungeon.png']);
+        dungeon.width = containerWidth;
+        dungeon.height = containerHeight;
         gameScene.addChild(dungeon);
 
         //Door
         door = new Sprite(myTexture['door.png']);
-        door.position.set(32, 0);
+        door.position.set(leftBorder, 5);
         gameScene.addChild(door);
 
         //Explorer 探险家
         explorer = new Sprite(myTexture['explorer.png']);
-        explorer.x = 68;
+        explorer.x = leftBorder * 2;
         explorer.y = gameScene.height / 2 - explorer.height / 2;
         explorer.vx = 0;
         explorer.vy = 0;
@@ -71,21 +181,21 @@
 
         //Treasure 宝藏
         treasure = new Sprite(myTexture['treasure.png']);
-        treasure.x = gameScene.width - treasure.width - 48;
+        treasure.x = gameScene.width - treasure.width - rightBorder;
         treasure.y = gameScene.height / 2 - treasure.height / 2;
         gameScene.addChild(treasure);
 
         // make blobs 生成泡泡怪
-        let numberOfBlobs = 6,
-            spacing = 48,
-            xOffset = 150,
+        let numberOfBlobs = 16,
+            spacing = (containerWidth - leftBorder * 5) / numberOfBlobs,
+            xOffset = leftBorder * 3,
             speed = 2,
             direction = 1;
         blobs = [];
         for (let i = 0; i < numberOfBlobs; i++) {
             let blob = new Sprite(myTexture['blob.png']);
             let x = spacing * i + xOffset;
-            let y = randomInt(0, app.stage.height - blob.height);
+            let y = randomInt(0, containerHeight - blob.height);
             blob.x = x;
             blob.y = y;
             blob.vy = speed * direction;
@@ -94,19 +204,25 @@
             gameScene.addChild(blob);
         }
         //制作血条
+        const healthBarText = new Text('HP ', new TextStyle({
+            fontSize: '24px',
+            fill: '0xffffff',
+        }));
+        healthBarText.position.set(containerWidth - healthBarWidth - rightBorder - 46, -2);
+        gameScene.addChild(healthBarText);
         healthBar = new PIXI.DisplayObjectContainer();
-        healthBar.position.set(stage.width - 170, 4);
+        healthBar.position.set(containerWidth - healthBarWidth - rightBorder, 1);
         gameScene.addChild(healthBar);
 
         let innerBar = new PIXI.Graphics();
         innerBar.beginFill(0x000000);
-        innerBar.drawRect(0, 0, 128, 8);
+        innerBar.drawRect(0, 0, healthBarWidth, healthBarHeight);
         innerBar.endFill();
         healthBar.addChild(innerBar);
 
         let outerBar = new PIXI.Graphics();
         outerBar.beginFill(0xFF3300);
-        outerBar.drawRect(0, 0, 128, 8);
+        outerBar.drawRect(0, 0, healthBarWidth, healthBarHeight);
         outerBar.endFill();
         healthBar.addChild(outerBar);
 
@@ -119,62 +235,40 @@
             fill: 'white',
         });
         message = new Text('The End!', style);
-        message.x = 120;
-        message.y = stage.height / 2 - 32;
+        message.x = containerWidth / 2 - message.width / 2;
+        message.y = stage.height / 2 - message.height / 2;
+        let replayMessage = new Text('Replay', style);
+        replayMessage.x = containerWidth / 2 - replayMessage.width / 2;
+        replayMessage.y = containerHeight / 2 + message.height / 2 + 20;
+        replayMessage.interactive = true;
+        replayMessage.buttonMode = true;
+        replayMessage.on('click', replay);
+        replayMessage.on('touchstart', replay);
+        gameOverScene.addChild(replayMessage);
         gameOverScene.addChild(message);
 
         state = play;
         app.ticker.add(delta => gameLoop(delta));
+        bindMoveKeyboard();
+    }
 
-        let left = keyboard(37),
-            up = keyboard(38),
-            right = keyboard(39),
-            down = keyboard(40);
-        left.press = () => {
-            explorer.vx = -2;
-            // explorer.vy = 0;
-        };
-        left.release = () => {
-            explorer.vx = 0;
-            // explorer.vy = 0;
-        };
-
-        right.press = () => {
-            explorer.vx = 2;
-            // explorer.vy = 0;
-        };
-        right.release = () => {
-            explorer.vx = 0;
-            // explorer.vy = 0;
-        };
-        up.press = () => {
-            // explorer.vx = 0;
-            explorer.vy = -2;
-        };
-        up.release = () => {
-            // explorer.vx = 0;
-            explorer.vy = 0;
-        };
-        down.press = () => {
-            // explorer.vx = 0;
-            explorer.vy = 2;
-        };
-        down.release = () => {
-            // explorer.vx = 0;
-            explorer.vy = 0;
-        }
+    function replay() {
+        window.location.reload(true);
     }
 
     function gameLoop(delta) {
         state(delta);
     }
 
+    /**
+     * 移动猎人
+     */
     function moveExplorer() {
         explorer.x += explorer.vx;
         explorer.y += explorer.vy;
         const direction = contain(explorer, container);
         if (direction === 'top') {
-            explorer.y += container.y;
+            explorer.y = container.y;
         } else if (direction === 'bottom') {
             explorer.y = container.height - explorer.height;
         } else if (direction === 'left') {
@@ -201,7 +295,7 @@
         });
         if (explorerHit) {
             explorer.alpha = .5;
-            healthBar.outer.width -= 1;
+            healthBar.outer.width -= 4;
             explorerHit = false;
         } else {
             explorer.alpha = 1;
