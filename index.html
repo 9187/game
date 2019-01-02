@@ -10,7 +10,9 @@
         }
     </style>
 </head>
-<body>
+<body style="width: 100%; height: 100%;">
+<div style="width: 500px; height: 480px; margin: 0 auto;"
+     id="container"></div>
 <script src="js/pixi.min.js"></script>
 <script>
     let Container = PIXI.Container,
@@ -23,20 +25,22 @@
 </script>
 <script>
     let app = new PIXI.Application({
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: 500,
+        height: 480,
     });
-    document.body.appendChild(app.view);
+    document.getElementById('container').appendChild(app.view);
+    // document.body.appendChild(app.view);
 
     loader.add('images/treasureHunter.json')
         .load(setup);
 
-    const stage = app.stage, container = {x: 28, y: 10, width: 488, height: 480};
+    const stage = app.stage, container = {x: 28, y: 8, width: 488, height: 480};
     let dungeon, explorer, treasure, explorerHit = false,
         myTexture, gameScene, gameOverScene;
 
     console.log(stage.x);
     console.log(stage.renderer.view.width);
+
     function setup() {
         //game start scene
         gameScene = new Container();
@@ -128,36 +132,36 @@
             down = keyboard(40);
         left.press = () => {
             explorer.vx = -2;
-            explorer.vy = 0;
+            // explorer.vy = 0;
         };
         left.release = () => {
             explorer.vx = 0;
-            explorer.vy = 0;
+            // explorer.vy = 0;
         };
 
         right.press = () => {
             explorer.vx = 2;
-            explorer.vy = 0;
+            // explorer.vy = 0;
         };
         right.release = () => {
             explorer.vx = 0;
-            explorer.vy = 0;
+            // explorer.vy = 0;
         };
         up.press = () => {
-            explorer.vx = 0;
+            // explorer.vx = 0;
             explorer.vy = -2;
         };
         up.release = () => {
-            explorer.vx = 0;
+            // explorer.vx = 0;
             explorer.vy = 0;
         };
-        down.press=()=>{
-            explorer.vx=0;
-            explorer.vy=2;
+        down.press = () => {
+            // explorer.vx = 0;
+            explorer.vy = 2;
         };
-        down.release=()=>{
-            explorer.vx=0;
-            explorer.vy=0;
+        down.release = () => {
+            // explorer.vx = 0;
+            explorer.vy = 0;
         }
     }
 
@@ -165,9 +169,23 @@
         state(delta);
     }
 
-    function play(delta) {
+    function moveExplorer() {
         explorer.x += explorer.vx;
         explorer.y += explorer.vy;
+        const direction = contain(explorer, container);
+        if (direction === 'top') {
+            explorer.y += container.y;
+        } else if (direction === 'bottom') {
+            explorer.y = container.height - explorer.height;
+        } else if (direction === 'left') {
+            explorer.x = container.x;
+        } else if (direction === 'right') {
+            explorer.x = container.width - explorer.width;
+        }
+    }
+
+    function play(delta) {
+        moveExplorer();
 
         blobs.forEach(blob => {
             blob.y += blob.vy;
